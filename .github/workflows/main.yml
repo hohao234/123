@@ -1,0 +1,47 @@
+name: Daily Sync M3U History
+
+on:
+  schedule:
+    # 每天北京时间早上 06:00 自动运行一次 (对应 UTC 22:00)
+    - cron: '0 22 * * *'
+  workflow_dispatch: # 允许你随时在 GitHub 页面上点按钮手动触发运行
+
+permissions:
+  contents: write
+
+jobs:
+  sync-m3u:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置 Python 环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: 安装依赖
+      run: |
+        pip install requests
+
+    - name: 执行历史累积同步脚本
+      run: |
+        python sync_m3u_history.py
+
+    - name: 提交累积更新到仓库
+      run: |
+        git config --local user.email "actions@github.com"
+        git config --local user.name "GitHub Actions"
+        
+        # 将生成的历史累积文件加入暂存区
+        git add history_accumulated.m3u
+        
+        # 只有在发现新源（文件发生变化）时才提交，防止无变化时报错
+        if ! git diff --staged --quiet; then
+          git commit -m "🤖 自动追加并累积最新直播源历史数据"
+          git push
+        else
+          echo "今天没有发现任何新频道加入，跳过本次提交。"
+        fi
